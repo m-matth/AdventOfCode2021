@@ -1,5 +1,3 @@
-{-# LANGUAGE TupleSections #-}
-
 module Day5
   ( day5
   ) where
@@ -21,30 +19,32 @@ parse ln =
 filterCoord :: Coord -> Bool
 filterCoord ((x, y), (x', y')) = x == x' || y == y'
 
-genPoints :: Coord -> [Point]
-genPoints ((x, y), (x', y'))
-  | x == x' && y > y' = map (x, ) [y' .. y]
-  | x == x' && y' > y = map (x, ) [y .. y']
-  | y == y' && x > x' = map (, y) [x' .. x]
-  | y == y' && x' > x = map (, y) [x .. x']
-  | x >= x' && y >= y' = [(x - z, y - z) | z <- [0 .. (x - x')]]
-  | x >= x' && y' >= y = [(x - z, y + z) | z <- [0 .. (x - x')]]
-  | x' >= x && y' >= y = [(x + z, y + z) | z <- [0 .. (x' - x)]]
-  | x' >= x && y >= y' = [(x + z, y - z) | z <- [0 .. (x' - x)]]
-  | otherwise = []
+type Points = M.Map Point Count
 
-frequency :: (Ord a) => [a] -> [(a, Int)]
-frequency xs = M.toList (M.fromListWith (+) [(x, 1) | x <- xs])
+type Count = Integer
+
+genPoints :: Points -> Coord -> Points
+genPoints m ((x, y), (x', y'))
+  | x == x' && y > y' = foldr (\v -> M.insertWith (+) (x, v) 1) m [y' .. y]
+  | x == x' && y' > y = foldr (\v -> M.insertWith (+) (x, v) 1) m [y .. y']
+  | y == y' && x > x' = foldr (\v -> M.insertWith (+) (v, y) 1) m [x' .. x]
+  | y == y' && x' > x = foldr (\v -> M.insertWith (+) (v, y) 1) m [x .. x']
+  | x >= x' && y >= y' =
+    foldr (flip (M.insertWith (+)) 1) m [(x - z, y - z) | z <- [0 .. (x - x')]]
+  | x >= x' && y' >= y =
+    foldr (flip (M.insertWith (+)) 1) m [(x - z, y + z) | z <- [0 .. (x - x')]]
+  | x' >= x && y' >= y =
+    foldr (flip (M.insertWith (+)) 1) m [(x + z, y + z) | z <- [0 .. (x' - x)]]
+  | x' >= x && y >= y' =
+    foldr (flip (M.insertWith (+)) 1) m [(x + z, y - z) | z <- [0 .. (x' - x)]]
+  | otherwise = m
+
+overlap :: Points -> Int
+overlap = M.size . M.filter (> 1)
 
 day5 :: IO ()
 day5 = do
   day5Data <- map parse . lines <$> readFile "input_day5.txt"
   let coords = filter filterCoord day5Data
-  print $
-    "day5 - part1 : " ++
-    show (length $ overlap $ frequency $ concatMap genPoints coords)
-  print $
-    "day5 - part2 : " ++
-    show (length $ overlap $ frequency $ concatMap genPoints day5Data)
-  where
-    overlap = filter ((> 1) . snd)
+  print $ "day5 - part1 : " ++ show (overlap $ foldl genPoints M.empty coords)
+  print $ "day5 - part2 : " ++ show (overlap $ foldl genPoints M.empty day5Data)
